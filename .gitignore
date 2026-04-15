@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+*.pyc
+static/uploads/
+dataset/
+raw_dataset/
+organic_data/
+clean_organic/
+*.zip
+models/training_curve.png
+models/training_history.json
+models/confusion_matrix.png
+models/gradcam_*.png
+check.py
+check2.py
