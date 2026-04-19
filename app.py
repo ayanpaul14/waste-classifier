@@ -15,23 +15,13 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
-# 6 classes in alphabetical order — must match how ImageFolder loads them
-WASTE_CLASSES = [
-    'cardboard',
-    'glass',
-    'metal',
-    'paper',
-    'plastic',
-    'trash'
-]
+WASTE_CLASSES = ['cardboard','glass','metal','paper','plastic','trash']
 
 CLASS_INFO = {
     'cardboard': {
-        'icon': '📦',
-        'bin': 'Blue recycling bin',
+        'icon': '📦', 'bin': 'Blue recycling bin',
         'tip': 'Flatten before disposal. Remove tape and staples.',
-        'color': '#8B6914',
-        'recyclable': True,
+        'color': '#8B6914', 'recyclable': True,
         'process': [
             {'step':1,'title':'Remove contaminants','desc':'Take out any plastic liners, bubble wrap, or foam inserts.','icon':'🧹'},
             {'step':2,'title':'Remove tape and staples','desc':'Peel off all adhesive tape and remove staples — these contaminate the batch.','icon':'📌'},
@@ -43,11 +33,9 @@ CLASS_INFO = {
         'recycling_rate': 85
     },
     'glass': {
-        'icon': '🫙',
-        'bin': 'Green glass bank',
+        'icon': '🫙', 'bin': 'Green glass bank',
         'tip': 'Rinse thoroughly. Do not mix with ceramics or mirrors.',
-        'color': '#2E7D32',
-        'recyclable': True,
+        'color': '#2E7D32', 'recyclable': True,
         'process': [
             {'step':1,'title':'Empty and rinse','desc':'Rinse bottles and jars with water to remove food or drink residue.','icon':'🚿'},
             {'step':2,'title':'Remove lids and caps','desc':'Metal lids go with metals. Plastic caps go in the plastic bin.','icon':'🔩'},
@@ -59,11 +47,9 @@ CLASS_INFO = {
         'recycling_rate': 76
     },
     'metal': {
-        'icon': '🥫',
-        'bin': 'Blue recycling bin',
+        'icon': '🥫', 'bin': 'Blue recycling bin',
         'tip': 'Rinse cans. Aluminium and steel are both recyclable.',
-        'color': '#546E7A',
-        'recyclable': True,
+        'color': '#546E7A', 'recyclable': True,
         'process': [
             {'step':1,'title':'Empty and rinse','desc':'Empty the can completely and give it a quick rinse to avoid contamination.','icon':'🚿'},
             {'step':2,'title':'Identify the metal','desc':'Use a magnet — steel sticks, aluminium does not. Both are recyclable.','icon':'🧲'},
@@ -75,11 +61,9 @@ CLASS_INFO = {
         'recycling_rate': 67
     },
     'paper': {
-        'icon': '📄',
-        'bin': 'Blue recycling bin',
+        'icon': '📄', 'bin': 'Blue recycling bin',
         'tip': 'Keep dry. Shredded paper goes in a sealed bag.',
-        'color': '#F57F17',
-        'recyclable': True,
+        'color': '#F57F17', 'recyclable': True,
         'process': [
             {'step':1,'title':'Check if it is clean','desc':'Paper with heavy food grease cannot be recycled. Tear off the soiled part, recycle the rest.','icon':'🔍'},
             {'step':2,'title':'Remove plastic elements','desc':'Remove plastic windows from envelopes and any plastic coatings.','icon':'🪟'},
@@ -91,11 +75,9 @@ CLASS_INFO = {
         'recycling_rate': 68
     },
     'plastic': {
-        'icon': '🧴',
-        'bin': 'Blue recycling bin',
+        'icon': '🧴', 'bin': 'Blue recycling bin',
         'tip': 'Check the resin code (1-7). Rinse containers before recycling.',
-        'color': '#1565C0',
-        'recyclable': True,
+        'color': '#1565C0', 'recyclable': True,
         'process': [
             {'step':1,'title':'Find the resin code','desc':'Look for the triangle symbol with a number (1-7). Codes 1 (PET) and 2 (HDPE) are most widely accepted.','icon':'🔢'},
             {'step':2,'title':'Empty and rinse','desc':'Rinse containers to remove food or liquid residue before recycling.','icon':'🚿'},
@@ -107,11 +89,9 @@ CLASS_INFO = {
         'recycling_rate': 44
     },
     'trash': {
-        'icon': '🗑️',
-        'bin': 'Black general waste bin',
+        'icon': '🗑️', 'bin': 'Black general waste bin',
         'tip': 'Non-recyclable waste. Consider if any part can be separated.',
-        'color': '#424242',
-        'recyclable': False,
+        'color': '#424242', 'recyclable': False,
         'process': [
             {'step':1,'title':'Double-check recyclability','desc':'Before binning, check if any part is recyclable — cardboard wrapping, metal, or glass.','icon':'🔍'},
             {'step':2,'title':'Check for special disposal','desc':'Batteries, electronics, medicines, and chemicals need special disposal — not general waste.','icon':'⚠️'},
@@ -163,15 +143,12 @@ def predict_image(image_path):
     probabilities = torch.softmax(outputs, dim=1)[0]
     confidence, predicted_idx = torch.max(probabilities, 0)
     predicted_class = WASTE_CLASSES[predicted_idx.item()]
-    confidence_pct = confidence.item() * 100
     info = CLASS_INFO[predicted_class]
     return {
         'predicted_class': predicted_class,
-        'confidence': round(confidence_pct, 1),
-        'bin': info['bin'],
-        'tip': info['tip'],
-        'icon': info['icon'],
-        'color': info['color'],
+        'confidence': round(confidence.item() * 100, 1),
+        'bin': info['bin'], 'tip': info['tip'],
+        'icon': info['icon'], 'color': info['color'],
         'recyclable': info['recyclable'],
         'process': info['process'],
         'fun_fact': info['fun_fact'],
@@ -218,4 +195,5 @@ def get_classes():
 if __name__ == '__main__':
     os.makedirs('static/uploads', exist_ok=True)
     os.makedirs('models', exist_ok=True)
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
