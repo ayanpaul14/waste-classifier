@@ -197,3 +197,7 @@ if __name__ == '__main__':
     os.makedirs('models', exist_ok=True)
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok'}), 200
