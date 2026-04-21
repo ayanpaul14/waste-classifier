@@ -1,82 +1,106 @@
+"""
+train.py  —  Train MobileNetV3-Small on the Gary Thung Garbage Classification dataset
+Run locally (not on Render) then upload waste_classifier.pth to your repo or cloud storage.
+
+Dataset: https://www.kaggle.com/datasets/asdasdasasdas/garbage-classification
+        OR: https://github.com/garythung/trashnet
+        Folder structure expected:
+            dataset/
+              cardboard/  (403 images)
+              glass/      (501 images)
+              metal/      (410 images)
+              paper/      (594 images)
+              plastic/    (482 images)
+              trash/      (137 images)
+
+Install deps first:
+    pip install torch torchvision Pillow tqdm
+"""
+
 import os
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import torchvision.models as models
 from torchvision.datasets import ImageFolder
-import matplotlib.pyplot as plt
-import json
+from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
-DATASET_DIR = 'dataset'
-MODEL_SAVE_PATH = 'models/waste_classifier.pth'
-NUM_CLASSES = 6
-BATCH_SIZE = 32
-NUM_EPOCHS = 20
-LEARNING_RATE = 1e-3
-WEIGHT_DECAY = 1e-4
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-IMAGE_SIZE = 224
+# ── Config ──────────────────────────────────────────────────────────────
+DATASET_DIR   = "dataset"          # path to your downloaded dataset folder
+MODEL_OUT     = "models/waste_classifier.pth"
+BATCH_SIZE    = 32
+EPOCHS        = 15
+LR            = 1e-3
+VAL_SPLIT     = 0.2
+DEVICE        = "cuda" if torch.cuda.is_available() else "cpu"
+WASTE_CLASSES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
+# ────────────────────────────────────────────────────────────────────────
 
-print(f"Training on: {DEVICE}")
+print(f"Using device: {DEVICE}")
 
-train_transforms = transforms.Compose([
+# ── Transforms ──────────────────────────────────────────────────────────
+train_tf = transforms.Compose([
     transforms.Resize((256, 256)),
-    transforms.RandomCrop(IMAGE_SIZE),
+    transforms.RandomCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2),
     transforms.RandomRotation(15),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
 ])
 
-val_transforms = transforms.Compose([
+val_tf = transforms.Compose([
     transforms.Resize(256),
-    transforms.CenterCrop(IMAGE_SIZE),
+    transforms.CenterCrop(224),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
 ])
 
-train_dataset = ImageFolder(root=os.path.join(DATASET_DIR, 'train'), transform=train_transforms)
-val_dataset   = ImageFolder(root=os.path.join(DATASET_DIR, 'val'),   transform=val_transforms)
-test_dataset  = ImageFolder(root=os.path.join(DATASET_DIR, 'test'),  transform=val_transforms)
+# ── Dataset ─────────────────────────────────────────────────────────────
+full_dataset = ImageFolder(root=DATASET_DIR, transform=train_tf)
+print(f"Total images: {len(full_dataset)}")
+print(f"Classes found: {full_dataset.classes}")
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True,  num_workers=0, pin_memory=False)
-val_loader   = DataLoader(val_dataset,   batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=False)
-test_loader  = DataLoader(test_dataset,  batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=False)
+# Warn if class order differs from WASTE_CLASSES
+if full_dataset.classes != WASTE_CLASSES:
+    print(f"WARNING: Dataset classes {full_dataset.classes} differ from expected {WASTE_CLASSES}")
+    print("Update WASTE_CLASSES in app.py to match:", full_dataset.classes)
 
-print(f"Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)}")
-print(f"Classes: {train_dataset.classes}")
+val_size  = int(len(full_dataset) * VAL_SPLIT)
+train_size = len(full_dataset) - val_size
+train_ds, val_ds = random_split(full_dataset, [train_size, val_size])
+val_ds.dataset = ImageFolder(root=DATASET_DIR, transform=val_tf)  # val uses val_tf
 
-if 'organic' not in train_dataset.classes:
-    print("WARNING: organic class not found! Check dataset/train/organic folder.")
-else:
-    print("Organic class found successfully.")
+train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=2)
+val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
 
-def build_model(num_classes):
-    model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-    for param in model.features.parameters():
-        param.requires_grad = False
-    in_features = model.classifier[3].in_features
-    model.classifier[3] = nn.Linear(in_features, num_classes)
-    return model
+# ── Model ────────────────────────────────────────────────────────────────
+model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
+in_features = model.classifier[3].in_features
+model.classifier[3] = nn.Linear(in_features, len(WASTE_CLASSES))
+model = model.to(DEVICE)
 
-model = build_model(NUM_CLASSES).to(DEVICE)
+# ── Loss + Optimizer ─────────────────────────────────────────────────────
+criterion = nn.CrossEntropyLoss()
 
-criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-optimizer = optim.AdamW(model.classifier.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
+# Phase 1: only train the new classifier head (frozen backbone)
+for param in model.features.parameters():
+    param.requires_grad = False
 
-history = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
-best_val_acc = 0.0
+optimizer = optim.Adam(model.classifier.parameters(), lr=LR)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
-def train_epoch(loader):
+# ── Training loop ────────────────────────────────────────────────────────
+def train_epoch(model, loader, optimizer, criterion):
     model.train()
     total_loss, correct, total = 0, 0, 0
-    for images, labels in tqdm(loader, desc='Train', leave=False):
+    for images, labels in tqdm(loader, leave=False):
         images, labels = images.to(DEVICE), labels.to(DEVICE)
         optimizer.zero_grad()
         outputs = model(images)
@@ -84,72 +108,63 @@ def train_epoch(loader):
         loss.backward()
         optimizer.step()
         total_loss += loss.item() * images.size(0)
-        correct += (outputs.argmax(1) == labels).sum().item()
+        _, preds = outputs.max(1)
+        correct += preds.eq(labels).sum().item()
         total += images.size(0)
-    return total_loss / total, correct / total
+    return total_loss / total, 100. * correct / total
 
-def eval_epoch(loader):
+
+def val_epoch(model, loader, criterion):
     model.eval()
     total_loss, correct, total = 0, 0, 0
     with torch.no_grad():
-        for images, labels in tqdm(loader, desc='Val', leave=False):
+        for images, labels in loader:
             images, labels = images.to(DEVICE), labels.to(DEVICE)
             outputs = model(images)
             loss = criterion(outputs, labels)
             total_loss += loss.item() * images.size(0)
-            correct += (outputs.argmax(1) == labels).sum().item()
+            _, preds = outputs.max(1)
+            correct += preds.eq(labels).sum().item()
             total += images.size(0)
-    return total_loss / total, correct / total
+    return total_loss / total, 100. * correct / total
 
-print("\n── Phase 1: Train head only (5 epochs) ──")
-for epoch in range(5):
-    tr_loss, tr_acc = train_epoch(train_loader)
-    vl_loss, vl_acc = eval_epoch(val_loader)
+
+print("\n── Phase 1: Training classifier head (5 epochs) ──")
+best_val_acc = 0
+for epoch in range(1, 6):
+    t0 = time.time()
+    tr_loss, tr_acc = train_epoch(model, train_loader, optimizer, criterion)
+    vl_loss, vl_acc = val_epoch(model, val_loader, criterion)
     scheduler.step()
-    print(f"Epoch {epoch+1:2d} | Train {tr_acc:.3f} | Val {vl_acc:.3f}")
-    history['train_loss'].append(tr_loss)
-    history['val_loss'].append(vl_loss)
-    history['train_acc'].append(tr_acc)
-    history['val_acc'].append(vl_acc)
-
-print("\n── Phase 2: Fine-tune full model (15 epochs) ──")
-for param in model.parameters():
-    param.requires_grad = True
-
-optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE * 0.1, weight_decay=WEIGHT_DECAY)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS - 5)
-
-for epoch in range(5, NUM_EPOCHS):
-    tr_loss, tr_acc = train_epoch(train_loader)
-    vl_loss, vl_acc = eval_epoch(val_loader)
-    scheduler.step()
-    print(f"Epoch {epoch+1:2d} | Train {tr_acc:.3f} | Val {vl_acc:.3f}")
-    history['train_loss'].append(tr_loss)
-    history['val_loss'].append(vl_loss)
-    history['train_acc'].append(tr_acc)
-    history['val_acc'].append(vl_acc)
+    print(f"Epoch {epoch:2d} | Train loss {tr_loss:.4f} acc {tr_acc:.1f}% | "
+          f"Val loss {vl_loss:.4f} acc {vl_acc:.1f}% | {time.time()-t0:.1f}s")
     if vl_acc > best_val_acc:
         best_val_acc = vl_acc
-        torch.save(model.state_dict(), MODEL_SAVE_PATH)
-        print(f"  Saved best model (val_acc={vl_acc:.4f})")
 
-print(f"\n── Test Evaluation ──")
-model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=DEVICE))
-test_loss, test_acc = eval_epoch(test_loader)
-print(f"Test Accuracy : {test_acc:.4f}")
-print(f"Best Val Acc  : {best_val_acc:.4f}")
+# Phase 2: Unfreeze backbone and fine-tune everything with lower LR
+print("\n── Phase 2: Fine-tuning full model (10 more epochs) ──")
+for param in model.features.parameters():
+    param.requires_grad = True
 
-with open('models/training_history.json', 'w') as f:
-    json.dump(history, f, indent=2)
-print("Saved training_history.json")
+optimizer = optim.Adam(model.parameters(), lr=LR * 0.1)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-axes[0].plot(history['train_loss'], label='Train')
-axes[0].plot(history['val_loss'],   label='Val')
-axes[0].set_title('Loss'); axes[0].set_xlabel('Epoch'); axes[0].legend()
-axes[1].plot(history['train_acc'], label='Train')
-axes[1].plot(history['val_acc'],   label='Val')
-axes[1].set_title('Accuracy'); axes[1].set_xlabel('Epoch'); axes[1].legend()
-plt.tight_layout()
-plt.savefig('models/training_curve.png', dpi=150)
-print("Saved training_curve.png")
+for epoch in range(6, EPOCHS + 1):
+    t0 = time.time()
+    tr_loss, tr_acc = train_epoch(model, train_loader, optimizer, criterion)
+    vl_loss, vl_acc = val_epoch(model, val_loader, criterion)
+    scheduler.step()
+    print(f"Epoch {epoch:2d} | Train loss {tr_loss:.4f} acc {tr_acc:.1f}% | "
+          f"Val loss {vl_loss:.4f} acc {vl_acc:.1f}% | {time.time()-t0:.1f}s")
+    if vl_acc > best_val_acc:
+        best_val_acc = vl_acc
+        os.makedirs("models", exist_ok=True)
+        torch.save(model.state_dict(), MODEL_OUT)
+        print(f"  ✅ Saved best model (val acc {vl_acc:.1f}%)")
+
+print(f"\nTraining complete. Best val accuracy: {best_val_acc:.1f}%")
+print(f"Model saved to: {MODEL_OUT}")
+print("\nNext steps:")
+print("  1. Copy models/waste_classifier.pth to your project")
+print("  2. Commit it to Git LFS  OR  upload to a CDN and download at startup")
+print("  3. Re-deploy on Render")
