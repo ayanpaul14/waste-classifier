@@ -8,7 +8,7 @@ Built with **MobileNetV3** (transfer learning) + **Flask** + animated **HTML/CSS
 
 ## Live Demo
 
-![WasteAI Demo](demo.png)
+Coming Soon..
 
 ---
 
