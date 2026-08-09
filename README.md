@@ -8,7 +8,7 @@ Built with **MobileNetV3** (transfer learning) + **Flask** + animated **HTML/CSS
 
 ## Live Demo
 
-Coming Soon..
+Try the live application here: **[https://waste-classifier-abgj.onrender.com](https://waste-classifier-abgj.onrender.com)**
 
 ---
 
