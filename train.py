@@ -129,7 +129,7 @@ def val_epoch(model, loader, criterion):
     return total_loss / total, 100. * correct / total
 
 
-print("\n── Phase 1: Training classifier head (5 epochs) ──")
+print("\n== Phase 1: Training classifier head (5 epochs) ==")
 best_val_acc = 0
 for epoch in range(1, 6):
     t0 = time.time()
@@ -142,7 +142,7 @@ for epoch in range(1, 6):
         best_val_acc = vl_acc
 
 # Phase 2: Unfreeze backbone and fine-tune everything with lower LR
-print("\n── Phase 2: Fine-tuning full model (10 more epochs) ──")
+print("\n== Phase 2: Fine-tuning full model (10 more epochs) ==")
 for param in model.features.parameters():
     param.requires_grad = True
 
@@ -160,7 +160,7 @@ for epoch in range(6, EPOCHS + 1):
         best_val_acc = vl_acc
         os.makedirs("models", exist_ok=True)
         torch.save(model.state_dict(), MODEL_OUT)
-        print(f"  ✅ Saved best model (val acc {vl_acc:.1f}%)")
+        print(f"  [OK] Saved best model (val acc {vl_acc:.1f}%)")
 
 print(f"\nTraining complete. Best val accuracy: {best_val_acc:.1f}%")
 print(f"Model saved to: {MODEL_OUT}")

@@ -19,7 +19,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 from PIL import Image
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-CLASSES = ['cardboard', 'glass', 'metal', 'organic', 'paper', 'plastic', 'trash']
+CLASSES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 WEIGHTS  = 'models/waste_classifier.pth'
 
 # ── Model ─────────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ all_preds  = np.array(all_preds)
 all_labels = np.array(all_labels)
 
 # ── Classification Report ─────────────────────────────────────────────────────
-print("\n── Classification Report ──")
+print("\n== Classification Report ==")
 print(classification_report(all_labels, all_preds, target_names=CLASSES, digits=4))
 
 # ── Confusion Matrix ──────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ class GradCAM:
 
 def visualize_gradcam(image_path, save_path):
     if not os.path.exists(image_path):
-        print(f"Skipping GradCAM — {image_path} not found")
+        print(f"Skipping GradCAM - {image_path} not found")
         return
 
     gradcam = GradCAM(model, model.features[-1])

@@ -130,7 +130,7 @@ def maybe_download_weights():
     if os.path.exists(WEIGHTS_PATH):
         return
     if not MODEL_DOWNLOAD_URL:
-        print("No MODEL_URL set and no local weights found — running in demo mode.")
+        print("No MODEL_URL set and no local weights found - running in demo mode.")
         return
     print(f"Downloading model weights from {MODEL_DOWNLOAD_URL} ...")
     os.makedirs('models', exist_ok=True)
@@ -141,7 +141,7 @@ def maybe_download_weights():
             f.write(r.content)
         print(f"Weights saved to {WEIGHTS_PATH}")
     except Exception as e:
-        print(f"Failed to download weights: {e}  — running in demo mode.")
+        print(f"Failed to download weights: {e} - running in demo mode.")
 
 
 def load_model():
@@ -151,9 +151,9 @@ def load_model():
     model.classifier[3] = nn.Linear(in_features, len(WASTE_CLASSES))
     if os.path.exists(WEIGHTS_PATH):
         model.load_state_dict(torch.load(WEIGHTS_PATH, map_location='cpu'))
-        print("✅ Loaded fine-tuned weights.")
+        print("[OK] Loaded fine-tuned weights.")
     else:
-        print("⚠️  No weights found — predictions will be random (demo mode).")
+        print("[WARN] No weights found - predictions will be random (demo mode).")
     model.eval()
     return model
 
