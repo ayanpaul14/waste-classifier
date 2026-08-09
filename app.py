@@ -4,6 +4,8 @@ import time
 import math
 import requests
 import torch
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
 import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.models as models
@@ -146,13 +148,16 @@ def maybe_download_weights():
 
 def load_model():
     maybe_download_weights()
-    model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-    in_features = model.classifier[3].in_features
-    model.classifier[3] = nn.Linear(in_features, len(WASTE_CLASSES))
     if os.path.exists(WEIGHTS_PATH):
+        model = models.mobilenet_v3_small(weights=None)
+        in_features = model.classifier[3].in_features
+        model.classifier[3] = nn.Linear(in_features, len(WASTE_CLASSES))
         model.load_state_dict(torch.load(WEIGHTS_PATH, map_location='cpu'))
         print("[OK] Loaded fine-tuned weights.")
     else:
+        model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
+        in_features = model.classifier[3].in_features
+        model.classifier[3] = nn.Linear(in_features, len(WASTE_CLASSES))
         print("[WARN] No weights found - predictions will be random (demo mode).")
     model.eval()
     return model
@@ -173,7 +178,7 @@ def predict_image(image_path):
     image = Image.open(image_path).convert('RGB')
     tensor = preprocess(image).unsqueeze(0)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         start = time.time()
         outputs = model(tensor)
         inference_time = (time.time() - start) * 1000
